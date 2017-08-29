@@ -838,8 +838,8 @@ NSString* const kCDVFilesystemURLPrefix = @"cdvfile";
     // arguments
     CDVFilesystemURL* localURI = [self fileSystemURLforArg:command.arguments[0]];
     NSString* encoding = [command argumentAtIndex:1];
-    NSInteger start = [[command argumentAtIndex:2] integerValue];
-    NSInteger end = [[command argumentAtIndex:3] integerValue];
+    // NSInteger start = [[command argumentAtIndex:2] integerValue];
+    // NSInteger end = [[command argumentAtIndex:3] integerValue];
 
     NSObject<CDVFileSystem> *fs = [self filesystemForURL:localURI];
 
@@ -860,24 +860,49 @@ NSString* const kCDVFilesystemURLPrefix = @"cdvfile";
     __weak CDVFile* weakSelf = self;
 
     [self.commandDelegate runInBackground:^ {
-        [fs readFileAtURL:localURI start:start end:end callback:^(NSData* data, NSString* mimeType, CDVFileError errorCode) {
-            CDVPluginResult* result = nil;
-            if (data != nil) {
-                NSString* str = [[NSString alloc] initWithBytesNoCopy:(void*)[data bytes] length:[data length] encoding:NSUTF8StringEncoding freeWhenDone:NO];
-                // Check that UTF8 conversion did not fail.
-                if (str != nil) {
-                    result = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:str];
-                    result.associatedObject = data;
-                } else {
-                    errorCode = ENCODING_ERR;
-                }
-            }
-            if (result == nil) {
-                result = [CDVPluginResult resultWithStatus:CDVCommandStatus_IO_EXCEPTION messageAsInt:errorCode];
-            }
+        CDVFileError errorCode = NO_ERROR;
+        CDVPluginResult* result = nil;
+        NSString *path = [self filesystemPathForURL:localURI];
+        NSData *buf = [NSData dataWithContentsOfFile:path
+                                             options:NSDataReadingMappedIfSafe
+                                               error:nil];
+        
+        NSString *data = [[NSString alloc]
+                           initWithBytesNoCopy:(void *)buf.bytes
+                           length:buf.length
+                           encoding:NSUTF8StringEncoding
+                           freeWhenDone:NO];
+        
+        if (data != nil) {
+            result = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:data];
+            result.associatedObject = buf;
+        } else {
+            errorCode = ENCODING_ERR;
+        }
+        if (result == nil) {
+            result = [CDVPluginResult resultWithStatus:CDVCommandStatus_IO_EXCEPTION messageAsInt:errorCode];
+        }
 
-            [weakSelf.commandDelegate sendPluginResult:result callbackId:command.callbackId];
-        }];
+        [weakSelf.commandDelegate sendPluginResult:result callbackId:command.callbackId];
+
+        // [fs readFileAtURL:localURI start:start end:end callback:^(NSData* data, NSString* mimeType, CDVFileError errorCode) {
+        //     CDVPluginResult* result = nil;
+        //     if (data != nil) {
+        //         NSString* str = [[NSString alloc] initWithBytesNoCopy:(void*)[data bytes] length:[data length] encoding:NSUTF8StringEncoding freeWhenDone:NO];
+        //         // Check that UTF8 conversion did not fail.
+        //         if (str != nil) {
+        //             result = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:str];
+        //             result.associatedObject = data;
+        //         } else {
+        //             errorCode = ENCODING_ERR;
+        //         }
+        //     }
+        //     if (result == nil) {
+        //         result = [CDVPluginResult resultWithStatus:CDVCommandStatus_IO_EXCEPTION messageAsInt:errorCode];
+        //     }
+
+        //     [weakSelf.commandDelegate sendPluginResult:result callbackId:command.callbackId];
+        // }];
     }];
 }
 
